@@ -124,11 +124,12 @@ export def OpenWorkflow(): void
     var workflow_path = matchstr(line, 'PATH: \zs[^ )]\+')
 
     # Check if the workflow is already expanded
+    # TODO: unify this collapsing behavior?
     var next_line = getline(line('.') + 1)
-    if next_line =~# '^        ➤ Run ID:'
+    if next_line =~# '(Run ID:'
       # Collapse the expanded workflow
       var current_line: number = line('.')
-      while getline(current_line + 1) =~# '^        ➤ Run ID:'
+      while getline(current_line + 1) =~# '(Run ID:'
         deletebufline('%', current_line + 1)
       endwhile
       return
@@ -157,15 +158,32 @@ export def OpenWorkflow(): void
           var run_id: string = string(run['id'])
           var run_status: string = string(run['status'])
           var run_conclusion: string = string(run['conclusion'])
-          var run_created_at: string = string(run['created_at'])
           var run_url: string = string(run['html_url'])
+          var run_number = string(run['run_number'])
 
+          #var ic = 'X'
+          #if run_conclusion == 'success'
+          #  ic = '√'
+          #else
+          #  ic = 'X'
+          #endif
+
+          #var run_details = $'       {ic}#{run_number}'
+          var emoji: string = ''
+          if match(run_conclusion, 'success') != -1
+            emoji = '✅'
+          elseif match(run_conclusion, 'failure') != -1
+            emoji = '❌'
+          else
+            emoji = '⚠️'  # For other statuses like 'neutral', 'cancelled', etc.
+          endif
+
+          # Format the run details with the emoji and parentheses for run_id
           var run_details = printf(
-                \ '        ➤ Run ID: %s | Status: %s | Conclusion: %s | Created: %s',
-                \ run_id,
-                \ run_status,
-                \ run_conclusion,
-                \ run_created_at
+                \ '        ➤ %s #%s (Run ID: %s)',
+                \ emoji,
+                \ run_number,
+                \ run_id
                 \ )
 
 
@@ -209,15 +227,15 @@ export def OpenWorkflowRun(): void
   var line: string = getline('.')
 
   # Check if the line contains a Run ID
-  if line =~# '^        ➤ Run ID: \zs\d\+'
-    var run_id: string = matchstr(line, '\d\+')
+  if line =~# '(Run ID: \zs\d\+)'
+    var run_id: string = matchstr(line, 'Run ID: \zs\d\+')
 
     # Check if the run is already expanded
     var next_line: string = getline(line('.') + 1)
-    if next_line =~# '^            ➤ Job:'
+    if next_line =~# 'Job:'
       # Collapse the expanded run
       var current_line: number = line('.')
-      while getline(current_line + 1) =~# '^            ➤ Job:'
+      while getline(current_line + 1) =~# 'Job:\|Step:'
         deletebufline('%', current_line + 1)
       endwhile
       return
@@ -247,13 +265,20 @@ export def OpenWorkflowRun(): void
         var job_conclusion: string = string(job['conclusion'])
         var job_started_at: string = string(job['started_at'])
 
+        var emoji: string = ''
+        if match(job_conclusion, 'success') != -1
+          emoji = '✅'
+        elseif match(job_conclusion, 'failure') != -1
+          emoji = '❌'
+        else
+          emoji = '⚠️'  # For other statuses like 'neutral', 'cancelled', etc.
+        endif
+
         # Format the job details
         var job_details: string = printf(
-              \ '            ➤ Job: %s | Status: %s | Conclusion: %s | Started: %s',
-              \ job_name,
-              \ job_status,
-              \ job_conclusion,
-              \ job_started_at
+              \ '            ➤ %s Job: %s',
+              \ emoji,
+              \ job_name
               \ )
 
         # Append the job details to the buffer
@@ -267,12 +292,19 @@ export def OpenWorkflowRun(): void
           var step_status: string = string(step['status'])
           var step_conclusion: string = string(step['conclusion'])
 
+          if match(step_conclusion, 'success') != -1
+            emoji = '✅'
+          elseif match(step_conclusion, 'failure') != -1
+            emoji = '❌'
+          else
+            emoji = '⚠️'  # For other statuses like 'neutral', 'cancelled', etc.
+          endif
+
           # Format the step details
           var step_details: string = printf(
-                \ '                ➤ Step: %s | Status: %s | Conclusion: %s',
-                \ step_name,
-                \ step_status,
-                \ step_conclusion
+                \ '                ➤ %s Step: %s',
+                \ emoji,
+                \ step_name
                 \ )
 
           # Append the step details to the buffer
@@ -296,7 +328,7 @@ export def HandleEnter()
   if line =~# '^    - .* (PATH: \zs\S\+)'
     OpenWorkflow()
   # Check if the line is a Run ID line
-  elseif line =~# '^        ➤ Run ID: \zs\d\+'
+  elseif line =~# '(Run ID: \zs\d\+)'
     OpenWorkflowRun()
   else
     echoerr "Error: Not a valid line for expansion."
