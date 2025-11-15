@@ -1,34 +1,23 @@
 # GitHub Actions Vim Plugin
 
-`github-actions.vim` is a Vim plugin that provides a convenient way to view and interact with GitHub Actions workflows directly from your Vim editor. It displays repository details, branch information, the latest commit, and a list of workflows in a sidebar buffer.
+`github-actions.vim` aims to mirror the functionality of the VSCode Actions extension and provides a convenient way to view and interact with GitHub Actions workflows directly in vim.
+
+![](https://github.com/user-attachments/assets/4eb1099a-4d07-432d-97f4-e33551b1ad7b)
+---
+
+## Requirements
+
+- Vim 8.0+ or Neovim.
+- The `gh` CLI tool must be installed and authenticated. You can install it from [GitHub CLI](https://cli.github.com/).
+
 
 ---
 
 ## Features
 
-- Displays repository details, including branch name, latest commit hash, and commit message.
 - Lists GitHub Actions workflows for the current repository.
 - Allows you to open workflow details in your default browser.
 - Toggle the GitHub Actions sidebar on and off.
-- Syntax highlighting for better readability.
-
----
-
-## Installation
-
-### Using [vim-plug](https://github.com/junegunn/vim-plug)
-
-Add the following line to your `.vimrc` or `init.vim`:
-
-```vim
-Plug 'yourusername/github-actions.vim'
-```
-
-Then, run the following command in Vim:
-
-```vim
-:PlugInstall
-```
 
 ---
 
@@ -73,24 +62,6 @@ Example:
 ```vim
 let g:github_actions_window_size = 40
 ```
-
----
-
-## Requirements
-
-- Vim 8.0+ or Neovim.
-- The `gh` CLI tool must be installed and authenticated. You can install it from [GitHub CLI](https://cli.github.com/).
-
----
-
-## Syntax Highlighting
-
-The plugin provides syntax highlighting for the GitHub Actions sidebar:
-
-- **Title**: Highlighted in yellow.
-- **Repository Details**: Highlighted in cyan.
-- **Workflows**: Highlighted in green.
-- **Error Messages**: Highlighted in red.
 
 ---
 

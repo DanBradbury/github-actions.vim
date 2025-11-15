@@ -1,3 +1,5 @@
+scriptencoding utf-8
+
 highlight Title ctermfg=Yellow guifg=#FFD700
 highlight Identifier ctermfg=Cyan guifg=#00FFFF
 highlight Function ctermfg=Green guifg=#00FF00
@@ -17,3 +19,4 @@ syntax match Function /^    - .* (PATH:.*)$/
 " Match error messages
 syntax match Error /^Error:.*/
 
+" vim:set ft=vim sw=2 sts=2 et:

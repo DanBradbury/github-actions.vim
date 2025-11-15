@@ -158,3 +158,4 @@ function! github_actions#toggle() abort
   endif
 endfunction
 
+" vim:set ft=vim sw=2 sts=2 et:
