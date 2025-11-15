@@ -2,7 +2,7 @@
 
 `github-actions.vim` aims to mirror the functionality of the VSCode Actions extension and provides a convenient way to view and interact with GitHub Actions workflows directly in vim.
 
-![](https://github.com/user-attachments/assets/4eb1099a-4d07-432d-97f4-e33551b1ad7b)
+![](https://github.com/user-attachments/assets/cdf45749-ff96-4921-9def-814cbee84e46)
 ---
 
 ## Requirements
