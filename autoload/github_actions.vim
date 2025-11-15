@@ -135,25 +135,27 @@ def github_actions#open_workflow()
   endif
 enddef
 
-def github_actions#toggle()
-  # Check if the buffer already exists
-  var bufnr = bufexists('GitHub Actions')
+function! github_actions#toggle() abort
+  " Check if the buffer already exists
+  let l:bufnr = bufexists('GitHub Actions')
 
-  if bufnr
-    # If the buffer exists, check if it's visible in any window
-    var bufwinid = bufwinnr('GitHub Actions')
+  if l:bufnr
+    " If the buffer exists, check if it's visible in any window
+    let l:bufwinid = bufwinnr('GitHub Actions')
 
-    if bufwinid > 0
-      # If the buffer is visible, close the window
-      execute $'{bufwinid} close'
+    if l:bufwinid > 0
+      execute l:bufwinid . 'wincmd c'
+      "call win_execute(bufwinid, 'close')
+      " If the buffer is visible, close the window
+      "execute bufwinid .. 'close'
     else
-      # If the buffer exists but is not visible, open it
-      execute $'buffer {bufnr}'
+      " If the buffer exists but is not visible, open it
+      execute 'buffer ' . bufnr
     endif
   else
-    # If the buffer doesn't exist, call GithubActions to create it
+    " If the buffer doesn't exist, call GithubActions to create it
     execute 'GithubActions'
   endif
-enddef
+endfunction
 
 " vim:set ft=vim sw=2 sts=2 et:
