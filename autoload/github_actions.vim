@@ -129,7 +129,7 @@ export def OpenWorkflow(): void
     if next_line =~# '(Run ID:'
       # Collapse the expanded workflow
       var current_line: number = line('.')
-      while getline(current_line + 1) =~# '(Run ID:'
+      while getline(current_line + 1) =~# '(Run ID:\|Job:\|Step:'
         deletebufline('%', current_line + 1)
       endwhile
       return
@@ -332,5 +332,46 @@ export def HandleEnter()
     OpenWorkflowRun()
   else
     echoerr "Error: Not a valid line for expansion."
+  endif
+enddef
+
+export def OpenInGithub()
+  var line = getline('.')
+  if line =~# '(PATH: \zs\S\+)'
+    var workflow_path = matchstr(line, 'PATH: \zs[^ )]\+')
+
+    if workflow_path != ''
+      var url = $'https://github.com/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows/{workflow_path}'
+      call system($'open {shellescape(url)}')
+    else
+      echo "Error: Unable to determine repository or workflow ID."
+    endif
+  elseif line =~# '(Run ID: \zs\d\+)'
+    var run_id = matchstr(line, '(Run ID: \zs\d\+')
+    if run_id != ''
+      var url = $'https://github.com/{g:github_actions_owner}/{g:github_actions_repo}/actions/runs/{run_id}'
+      call system($'open {shellescape(url)}')
+    endif
+  endif
+enddef
+
+export def OpenWorkflowFile()
+  var line = getline('.')
+  if line =~# '(PATH: \zs\S\+)'
+    var workflow_path = matchstr(line, 'PATH: \zs[^ )]\+')
+    var file = $'.github/workflows/{workflow_path}'
+    if workflow_path != ''
+      execute $'tabnew {file}'
+      return
+    endif
+  else
+    for lnum in range(line('.') - 1, 1, -1) # Iterate in reverse from the current line to the first line
+      var buffer_line = getline(lnum)
+      if buffer_line =~# '(PATH: \zs\S\+)'
+        var workflow_path = matchstr(buffer_line, 'PATH: \zs[^ )]\+')
+        execute $'tabnew .github/workflows/{workflow_path}'
+        return
+      endif
+    endfor
   endif
 enddef

@@ -12,8 +12,20 @@ def HandleEnterWrapper()
   base.HandleEnter()
 enddef
 
+def OpenInGithubWrapper()
+  base.OpenInGithub()
+enddef
+
+def OpenWorkflowFileWrapper()
+  base.OpenWorkflowFile()
+enddef
+
 command! -nargs=0 GithubActions base.ViewWorkflows()
 command! -nargs=0 GithubActionsToggle base.ToggleWorkflowBuffer()
 
 command! HandleEnterWrapper HandleEnterWrapper()
+command! OpenInGithubWrapper OpenInGithubWrapper()
+command! OpenWorkflowFileWrapper OpenWorkflowFileWrapper()
 autocmd FileType github_actions nnoremap <buffer> <CR> :HandleEnterWrapper<CR>
+autocmd FileType github_actions nnoremap <buffer> <C-o> :OpenInGithubWrapper<CR>
+autocmd FileType github_actions nnoremap <buffer> gf :OpenWorkflowFileWrapper<CR>
