@@ -11,7 +11,7 @@ syntax match Title /^\(===\+\|GitHub Actions\)$/
 # Match repository details
 syntax match Identifier /^✔ Repository:.*/
 syntax match Identifier /^➤ Branch:.*/
-syntax match Identifier /^➤ Latest Commit:.*/
+syntax match Identifier /^➤ Commit:.*/
 syntax match Identifier /^➤ Message:.*/
 
 # Match workflows

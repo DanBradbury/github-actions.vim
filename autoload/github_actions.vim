@@ -62,11 +62,14 @@ export def ViewWorkflows()
     var commit_hash = substitute(system('git log -1 --pretty=format:"%h"'), '\n', '', '')
     var commit_message = substitute(system('git log -1 --pretty=format:"%s"'), '\n', '', '')
 
+    var remote_url = substitute(system('git config --get remote.origin.url'), '\n', '', '')
+    remote_url = substitute(remote_url, '.*github.com[:/]', '', '')
+
     # Add Git details to the buffer
-    setline(5, '✔ Repository: Yes')
-    setline(6, $'➤ Branch: {branch_name}')
-    setline(7, $'➤ Latest Commit: {commit_hash}')
-    setline(8, $'➤ Message: {commit_message}')
+    setline(5, $'✔ Repository: {remote_url}')
+    setline(6, $'➤ Branch:     {branch_name}')
+    setline(7, $'➤ Commit:     {commit_hash}')
+    setline(8, $'➤ Message:    {commit_message}')
 
     # Get the remote URL
     var git_remote_url = system('git remote get-url origin 2>/dev/null')

@@ -2,7 +2,7 @@
 
 `github-actions.vim` provides a convenient way to view and interact with GitHub Actions directly in vim.
 
-![](https://github.com/user-attachments/assets/cdf45749-ff96-4921-9def-814cbee84e46)
+![](https://github.com/user-attachments/assets/ed1c020b-3738-4921-abaa-70a466c77741)
 
 ---
 
