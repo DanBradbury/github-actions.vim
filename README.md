@@ -1,15 +1,15 @@
-# GitHub Actions Vim Plugin
+# GitHub Actions for Vim
 
-`github-actions.vim` aims to mirror the functionality of the VSCode Actions extension and provides a convenient way to view and interact with GitHub Actions workflows directly in vim.
+`github-actions.vim` provides a convenient way to view and interact with GitHub Actions directly in vim.
 
 ![](https://github.com/user-attachments/assets/cdf45749-ff96-4921-9def-814cbee84e46)
+
 ---
 
 ## Requirements
 
-- Vim 8.0+ or Neovim.
+- Vim 9.0+ or Neovim.
 - The `gh` CLI tool must be installed and authenticated. You can install it from [GitHub CLI](https://cli.github.com/).
-
 
 ---
 
@@ -33,7 +33,8 @@
 
 ### Keybindings
 
-- Press `<CR>` (Enter) on a workflow line in the sidebar to open the workflow in your default browser.
+- Press `<CR>` (Enter) on a workflow line to open the workflow in your default browser.
+- Press `gf` in the actions window to open the the workflow file in the last active window.
 
 ---
 
@@ -62,15 +63,6 @@ Example:
 ```vim
 let g:github_actions_window_size = 40
 ```
-
----
-
-## Example Workflow
-
-1. Open a Git repository in Vim.
-2. Run `:GithubActions` to open the sidebar.
-3. View repository details and workflows.
-4. Press `<CR>` on a workflow to open it in your browser.
 
 ---
 

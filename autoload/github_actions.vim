@@ -2,6 +2,8 @@ vim9script
 scriptencoding utf-8
 
 export def ViewWorkflows()
+  g:github_actions_last_window = win_getid()
+
   # Check if the buffer already exists
   for lbuf in range(1, bufnr('$'))
     if bufname(lbuf) ==# 'GitHub Actions'
@@ -361,7 +363,8 @@ export def OpenWorkflowFile()
     var workflow_path = matchstr(line, 'PATH: \zs[^ )]\+')
     var file = $'.github/workflows/{workflow_path}'
     if workflow_path != ''
-      execute $'tabnew {file}'
+      win_gotoid(g:github_actions_last_window)
+      execute $'edit {file}'
       return
     endif
   else
@@ -369,7 +372,8 @@ export def OpenWorkflowFile()
       var buffer_line = getline(lnum)
       if buffer_line =~# '(PATH: \zs\S\+)'
         var workflow_path = matchstr(buffer_line, 'PATH: \zs[^ )]\+')
-        execute $'tabnew .github/workflows/{workflow_path}'
+        win_gotoid(g:github_actions_last_window)
+        execute $'edit .github/workflows/{workflow_path}'
         return
       endif
     endfor
