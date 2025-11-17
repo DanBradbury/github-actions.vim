@@ -1,0 +1,151 @@
+*github-actions.txt*  GitHub Actions Integration for Vim
+
+Author: Dan Bradbury <https://danbradbury.net/>
+License: Same terms as Vim itself (see |license|)
+
+==============================================================================
+CONTENTS                                               *github-actions-contents*
+
+    1. Introduction ............................ |github-actions-introduction|
+    2. Requirements ............................ |github-actions-requirements|
+    3. Setup ................................... |github-actions-setup|
+    4. Commands ................................ |github-actions-commands|
+    5. Key Mappings ............................ |github-actions-mappings|
+    6. Features ................................ |github-actions-features|
+        6.1 Workflow Viewer .................... |github-actions-workflow-viewer|
+        6.2 Workflow Runs ...................... |github-actions-workflow-runs|
+        6.3 Open in GitHub ..................... |github-actions-open-in-github|
+        6.4 Open Workflow File ................. |github-actions-open-workflow-file|
+    7. Configuration ........................... |github-actions-configuration|
+    8. Troubleshooting ......................... |github-actions-troubleshooting|
+
+==============================================================================
+1. Introduction                                     *github-actions-introduction*
+
+The `github-actions.vim` plugin provides an integrated way to view and interact
+with GitHub Actions workflows directly from Vim. It allows you to view
+workflows, inspect workflow runs, and open related files or GitHub pages.
+
+==============================================================================
+2. Requirements                                     *github-actions-requirements*
+
+- Vim 9.0 or newer
+- GitHub CLI (`gh`) installed and authenticated
+- A GitHub repository with GitHub Actions workflows
+
+==============================================================================
+3. Setup                                                *github-actions-setup*
+
+1. Install the plugin using your preferred plugin manager.
+   Example with vim-plug:
+   >
+       Plug 'DanBradbury/github-actions.vim'
+   <
+
+2. Ensure the GitHub CLI (`gh`) is installed and authenticated:
+   >
+       gh auth login
+   <
+
+3. Open a Git repository in Vim and run `:GithubActions` to view workflows.
+
+==============================================================================
+4. Commands                                           *github-actions-commands*
+
+                                                      *:GithubActions*
+:GithubActions            Opens the GitHub Actions sidebar to view workflows.
+
+                                                      *:GithubActionsToggle*
+:GithubActionsToggle      Toggles the visibility of the GitHub Actions sidebar.
+
+==============================================================================
+5. Key Mappings                                       *github-actions-mappings*
+
+The following key mappings are available in the GitHub Actions sidebar:
+
+    <CR>             Expands or collapses workflows, runs, or jobs.
+    <C-o>            Opens the current workflow or run in GitHub.
+    gf               Opens the workflow file associated with the current line.
+
+These mappings are buffer-local and only apply to the GitHub Actions sidebar.
+
+==============================================================================
+6. Features                                           *github-actions-features*
+
+------------------------------------------------------------------------------
+6.1 Workflow Viewer                              *github-actions-workflow-viewer*
+
+The plugin provides a sidebar to view GitHub Actions workflows for the current
+repository. The sidebar displays:
+
+- Repository details (name, branch, commit, message)
+- A list of workflows with their names and paths
+
+To open the sidebar, use the `:GithubActions` or `:GithubActionsToggle` command.
+
+------------------------------------------------------------------------------
+6.2 Workflow Runs                                *github-actions-workflow-runs*
+
+You can expand workflows to view their recent runs. Each run displays:
+
+- Run ID
+- Status (e.g., success, failure)
+- Run number
+
+You can further expand runs to view their jobs and steps.
+
+------------------------------------------------------------------------------
+6.3 Open in GitHub                              *github-actions-open-in-github*
+
+The plugin allows you to open workflows or runs in the GitHub web interface:
+
+1. Place the cursor on a workflow or run line.
+2. Press `<C-o>` or run `:OpenInGithubWrapper`.
+
+------------------------------------------------------------------------------
+6.4 Open Workflow File                        *github-actions-open-workflow-file*
+
+You can open the workflow file associated with a workflow directly in Vim:
+
+1. Place the cursor on a workflow line.
+2. Press `gf` or run `:OpenWorkflowFileWrapper`.
+
+==============================================================================
+7. Configuration                                 *github-actions-configuration*
+
+The plugin provides the following global variables for configuration:
+
+                                                      *g:github_actions_window_side*
+`g:github_actions_window_side`:
+    Controls the position of the GitHub Actions sidebar.
+    Valid values: `'left'` (default), `'right'`.
+
+                                                      *g:github_actions_window_size*
+`g:github_actions_window_size`:
+    Sets the width of the GitHub Actions sidebar.
+    Default: `50`.
+
+Example configuration:
+>
+    let g:github_actions_window_side = 'right'
+    let g:github_actions_window_size = 40
+<
+
+==============================================================================
+8. Troubleshooting                             *github-actions-troubleshooting*
+
+- Ensure the GitHub CLI (`gh`) is installed and authenticated:
+  >
+      gh auth login
+  <
+
+- If workflows are not displayed, verify that the current directory is a GitHub
+  repository with GitHub Actions workflows.
+
+- If you encounter errors, check the `:messages` output for details.
+
+For further assistance, visit the GitHub repository:
+https://github.com/DanBradbury/github-actions.vim
+
+
+ vim:tw=78:ts=8:noet:ft=help:norl:
