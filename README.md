@@ -8,7 +8,7 @@ https://github.com/user-attachments/assets/22c821bf-8dc0-4260-a00e-b3282685d493
 
 ## Requirements
 
-- Vim 9.0+ or Neovim.
+- Vim 9.0+
 - The `gh` CLI tool must be installed and authenticated. You can install it from [GitHub CLI](https://cli.github.com/).
 
 ---
