@@ -80,7 +80,9 @@ export def ViewWorkflows()
     # Extract owner and repo from the URL
     if git_remote_url =~ 'github\.com[:/]'
       var owner_repo = matchstr(git_remote_url, 'github\.com[:/]\zs[^/]*\/[^/]*')
-      [g:github_actions_owner, g:github_actions_repo] = split(owner_repo, '/')
+      var repo_split = split(owner_repo, '/')
+      g:github_actions_owner = repo_split[0]
+      g:github_actions_repo =  repo_split[1]
     else
       echo "Not a GitHub repository"
       g:github_actions_owner = ''
@@ -143,11 +145,11 @@ export def OpenWorkflow(): void
     # Construct the API URL for the workflow runs
     if workflow_path !=# ''
       var api_url: string = printf(
-            \ 'repos/%s/%s/actions/workflows/%s/runs',
-            \ g:github_actions_owner,
-            \ g:github_actions_repo,
-            \ workflow_path
-            \ )
+        'repos/%s/%s/actions/workflows/%s/runs',
+        g:github_actions_owner,
+        g:github_actions_repo,
+        workflow_path
+      )
 
       # Fetch the recent runs using the GitHub CLI
       var runs_json: string = system('gh api ' .. api_url .. ' --jq ".workflow_runs" 2>/dev/null')
@@ -185,11 +187,11 @@ export def OpenWorkflow(): void
 
           # Format the run details with the emoji and parentheses for run_id
           var run_details = printf(
-                \ '        ➤ %s #%s (Run ID: %s)',
-                \ emoji,
-                \ run_number,
-                \ run_id
-                \ )
+            '        ➤ %s #%s (Run ID: %s)',
+            emoji,
+            run_number,
+            run_id
+          )
 
 
           # Append the run details to the buffer
@@ -248,11 +250,11 @@ export def OpenWorkflowRun(): void
 
     # Construct the API URL for the jobs in the run
     var api_url: string = printf(
-          \ 'repos/%s/%s/actions/runs/%s/jobs',
-          \ g:github_actions_owner,
-          \ g:github_actions_repo,
-          \ run_id
-          \ )
+      'repos/%s/%s/actions/runs/%s/jobs',
+      g:github_actions_owner,
+      g:github_actions_repo,
+      run_id
+    )
 
     # Fetch the jobs using the GitHub CLI
     var jobs_json: string = system('gh api ' .. api_url .. ' --jq ".jobs" 2>/dev/null')
@@ -281,10 +283,10 @@ export def OpenWorkflowRun(): void
 
         # Format the job details
         var job_details: string = printf(
-              \ '            ➤ %s Job: %s',
-              \ emoji,
-              \ job_name
-              \ )
+          '            ➤ %s Job: %s',
+          emoji,
+          job_name
+        )
 
         # Append the job details to the buffer
         append(current_line, job_details)
@@ -307,10 +309,10 @@ export def OpenWorkflowRun(): void
 
           # Format the step details
           var step_details: string = printf(
-                \ '                ➤ %s Step: %s',
-                \ emoji,
-                \ step_name
-                \ )
+            '                ➤ %s Step: %s',
+            emoji,
+            step_name
+          )
 
           # Append the step details to the buffer
           append(current_line, step_details)
