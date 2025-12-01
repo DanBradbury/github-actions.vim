@@ -81,8 +81,11 @@ export def ViewWorkflows(): void
     if git_remote_url =~ 'github\.com[:/]'
       var owner_repo: string = matchstr(git_remote_url, 'github\.com[:/]\zs[^/]*\/[^/]*')
       var split_values: list<string> = split(owner_repo, '/')
+      var raw_repo: string = split_values[1]
+      raw_repo = substitute(raw_repo, '\.git$', '', '')
       g:github_actions_owner = split_values[0]
-      g:github_actions_repo = split_values[1]
+      g:github_actions_repo = raw_repo
+
     else
       echo "Not a GitHub repository"
       g:github_actions_owner = ''
@@ -262,7 +265,7 @@ export def OpenWorkflowRun(): void
     # Check if the gh CLI command succeeded
     if v:shell_error == 0
       # Parse the JSON into a Vim dictionary
-      var jobs: dict<any> = json_decode(jobs_json)
+      var jobs: list<any> = json_decode(jobs_json)
 
       # Add the jobs below the run
       var current_line: number = line('.')
@@ -293,7 +296,7 @@ export def OpenWorkflowRun(): void
         current_line += 1
 
         # Add the steps for the job
-        var steps: dict<any> = job['steps']
+        var steps: list<any> = job['steps']
         for step in steps
           var step_name: string = string(step['name'])
           var step_status: string = string(step['status'])
