@@ -145,11 +145,11 @@ export def OpenWorkflow(): void
     # Construct the API URL for the workflow runs
     if workflow_path !=# ''
       var api_url: string = printf(
-            \ 'repos/%s/%s/actions/workflows/%s/runs',
-            \ g:github_actions_owner,
-            \ g:github_actions_repo,
-            \ workflow_path
-            \ )
+          'repos/%s/%s/actions/workflows/%s/runs',
+          g:github_actions_owner,
+          g:github_actions_repo,
+          workflow_path
+      )
 
       # Fetch the recent runs using the GitHub CLI
       var runs_json: string = system('gh api ' .. api_url .. ' --jq ".workflow_runs" 2>/dev/null')
