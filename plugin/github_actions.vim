@@ -22,7 +22,6 @@ def OpenWorkflowFileWrapper()
 enddef
 
 command! -nargs=0 GithubActions base.ViewWorkflows()
-command! -nargs=0 GithubActionsToggle base.ToggleWorkflowBuffer()
 
 command! HandleEnterWrapper HandleEnterWrapper()
 command! OpenInGithubWrapper OpenInGithubWrapper()

@@ -1,83 +1,68 @@
 vim9script
 scriptencoding utf-8
 
+var current_selection = 1
+var popup_content = []
+
+export def HandleEnter(line: string): void
+  if line =~ '(PATH: \zs\S\+)'
+    OpenWorkflow(line)
+  elseif line =~ '(Run ID: \zs\d\+)'
+    OpenWorkflowRun(line)
+  else
+    echoerr "Error: Not a valid line for expansion."
+  endif
+enddef
+
+export def FilterPopup(winid: number, key: string): number
+  # TODO: add open in github + workflow file support
+  if key ==? 'j' || key ==? "\<Down>" || key ==? "\<Left>" || key ==? "\<Right>"
+    current_selection = (current_selection + 1) % len(popup_content)
+  elseif key ==? 'k' || key ==? "\<Up>"
+    current_selection = (current_selection - 1 + len(popup_content)) % len(popup_content)
+  elseif key ==? "\<CR>" || key ==? "\<Space>"
+    var selected_model: string = popup_content[current_selection]
+    HandleEnter(selected_model)
+  elseif key ==? "\<Esc>" || key ==? 'q'
+    popup_close(winid)
+    redraw!
+    e!
+    return 1
+  endif
+
+  popup_settext(winid, popup_content)
+  prop_add(current_selection + 1, 1, {
+    'type': 'highlight',
+    'length': 60,
+    'bufnr': winbufnr(winid)
+  })
+  redraw
+
+  return 1
+enddef
+
 export def ViewWorkflows(): void
+  popup_content = []
   g:github_actions_last_window = win_getid()
 
-  # Check if the buffer already exists
-  for lbuf in range(1, bufnr('$'))
-    if bufname(lbuf) ==# 'GitHub Actions'
-      # If the buffer exists, switch to it
-      execute $'buffer {lbuf}'
-      return
-    endif
-  endfor
-
-  # Determine the side to open the buffer
-  if !exists('g:github_actions_window_side')
-    g:github_actions_window_side = 'left' # Default to left
-  endif
-
-  if g:github_actions_window_side ==# 'left'
-    execute 'topleft vnew'
-  elseif g:github_actions_window_side ==# 'right'
-    execute 'botright vnew'
-  else
-    echoerr "Invalid value for g:github_actions_window_side. Use 'left' or 'right'."
-    return
-  endif
-
-  # Set the buffer options for the sidebar
-  execute 'file GitHub Actions'
-  setlocal buftype=nofile
-  setlocal bufhidden=wipe
-  setlocal nobuflisted
-  setlocal noswapfile
-  setlocal nonumber
-  setlocal norelativenumber
-  setlocal foldcolumn=0
-  setlocal signcolumn=no
-
-  # Set the width of the sidebar
-  if !exists('g:github_actions_window_size')
-    g:github_actions_window_size = '50'
-  endif
-
-  execute $'vertical resize {g:github_actions_window_size}'
-
-  # Add the "GitHub Actions" header with styling
-   setline(1, '===========================')
-   setline(2, '      GitHub Actions')
-   setline(3, '===========================')
-   setline(4, '') # Add a blank line
-
-  # Check if the current directory is a Git repository
   var is_git_repo: bool = system('git rev-parse --is-inside-work-tree 2>/dev/null') =~ 'true'
 
   if is_git_repo
-    # Fetch the current branch name
     var branch_name: string = substitute(system('git rev-parse --abbrev-ref HEAD'), '\n', '', '')
-
-    # Fetch the latest commit hash and message
     var commit_hash: string = substitute(system('git log -1 --pretty=format:"%h"'), '\n', '', '')
     var commit_message: string = substitute(system('git log -1 --pretty=format:"%s"'), '\n', '', '')
-
     var remote_url: string = substitute(system('git config --get remote.origin.url'), '\n', '', '')
     remote_url = substitute(remote_url, '.*github.com[:/]', '', '')
 
-    # Add Git details to the buffer
-    setline(5, $'✔ Repository: {remote_url}')
-    setline(6, $'➤ Branch:     {branch_name}')
-    setline(7, $'➤ Commit:     {commit_hash}')
-    setline(8, $'➤ Message:    {commit_message}')
+    popup_content->add($'✔ Repository: {remote_url}')
+    popup_content->add($'➤ Branch:     {branch_name}')
+    popup_content->add($'➤ Commit:     {commit_hash}')
+    popup_content->add($'➤ Message:    {commit_message}')
+    popup_content->add('')
 
-    # Get the remote URL
     var git_remote_url: string = system('git remote get-url origin 2>/dev/null')
-    # Remove trailing newline
     git_remote_url = substitute(git_remote_url, '\n$', '', '')
-    setline(9, '')
 
-    # Extract owner and repo from the URL
     if git_remote_url =~ 'github\.com[:/]'
       var owner_repo: string = matchstr(git_remote_url, 'github\.com[:/]\zs[^/]*\/[^/]*')
       var split_values: list<string> = split(owner_repo, '/')
@@ -92,78 +77,81 @@ export def ViewWorkflows(): void
       g:github_actions_repo = ''
     endif
 
-
-    # Fetch GitHub Actions workflows using the gh CLI
     var workflows_json: string = system($'gh api repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows --jq ".workflows" 2>/dev/null')
 
-    # Check if the gh CLI command succeeded
     if v:shell_error == 0
-      # Parse the JSON into a Vim dictionary
       var workflows: list<dict<any>> = json_decode(workflows_json)
+      popup_content->add('Workflows:')
 
-      # Add workflows to the buffer
-      setline(10, 'Workflows:')
-      var line: number = 11
       for workflow in workflows
         var cleaned_workflow_path: string = substitute(workflow.path, '\v(\.github/workflows/|dynamic/)', '', '')
-        setline(line, $'    - {workflow.name} (PATH: {cleaned_workflow_path})')
-        line += 1
+        popup_content->add($'    - {workflow.name} (PATH: {cleaned_workflow_path})')
       endfor
     else
-      # Add an error message if the gh CLI command failed
-      setline(10, 'Error: Unable to fetch workflows. Ensure the gh CLI is authenticated.')
+      popup_content->add('Error: Unable to fetch workflows. Ensure the gh CLI is authenticated.')
     endif
   else
-    # Add a message indicating this is not a Git repository
-    setline(5, 'Repository: No')
-    setline(6, 'This directory is not a Git repository.')
+    popup_content->add('Repository: No')
+    popup_content->add('This directory is not a Git repository.')
   endif
 
-  setlocal filetype=github_actions
-
-  # Move the cursor to the end of the buffer
-  normal! G
+  var options = {
+    'border': [1, 1, 1, 1],
+    'borderchars': ['─', '│', '─', '│', '┌', '┐', '┘', '└'],
+    'borderhighlight': ['DiffAdd'],
+    'padding': [1, 1, 1, 1],
+    'pos': 'center',
+    'minwidth': 50,
+    'mapping': 0,
+    'title': ' GitHub Actions',
+    'filter': FilterPopup,
+  }
+  var popup_id = popup_create(popup_content, options)
+  var bufnr = winbufnr(popup_id)
+  execute 'highlight! GithubActionsCurrentSelection cterm=underline gui=bold'
+  prop_type_add('highlight', {'highlight': 'GithubActionsCurrentSelection', 'bufnr': winbufnr(popup_id)})
 enddef
 
-export def OpenWorkflow(): void
-  # Get the current line
-  var line: string = getline('.')
+def CheckCollapse(initial_search: string, while_check: string): bool
+  var next_line: string = ''
+  if len(popup_content) > current_selection + 1
+    next_line = popup_content[current_selection + 1]
+  endif
 
-  # Check if the line contains a workflow
-  if line =~# '^    - .* (PATH: \zs\S\+)'
+  if next_line =~# initial_search
+    var line_content: string = popup_content[current_selection]
+    var l = current_selection
+    var matches = true
+    while (l + 1 <= len(popup_content) - 1) && popup_content[l + 1] =~# while_check
+      remove(popup_content, l + 1)
+    endwhile
+
+    return true
+  endif
+  return false
+enddef
+
+export def OpenWorkflow(line: string): void
+  if line =~# '(PATH: \zs\S\+)'
     var workflow_path: string = matchstr(line, 'PATH: \zs[^ )]\+')
 
-    # Check if the workflow is already expanded
-    # TODO: unify this collapsing behavior?
-    var next_line: string = getline(line('.') + 1)
-    if next_line =~# '(Run ID:'
-      # Collapse the expanded workflow
-      var current_line: number = line('.')
-      while getline(current_line + 1) =~# '(Run ID:\|Job:\|Step:'
-        deletebufline('%', current_line + 1)
-      endwhile
+    if CheckCollapse('Run ID:', 'Run ID:\|Job:\|Step:')
       return
     endif
 
-    # Construct the API URL for the workflow runs
     if workflow_path !=# ''
       var api_url: string = printf(
-          'repos/%s/%s/actions/workflows/%s/runs',
-          g:github_actions_owner,
-          g:github_actions_repo,
-          workflow_path
+        'repos/%s/%s/actions/workflows/%s/runs',
+        g:github_actions_owner,
+        g:github_actions_repo,
+        workflow_path
       )
 
-      # Fetch the recent runs using the GitHub CLI
       var runs_json: string = system('gh api ' .. api_url .. ' --jq ".workflow_runs" 2>/dev/null')
 
-      # Check if the gh CLI command succeeded
       if v:shell_error == 0
-        # Parse the JSON into a Vim dictionary
         var runs: list<any> = json_decode(runs_json)
 
-        # Add the recent runs below the workflow
-        var current_line: number = line('.')
         for run in runs
           var run_id: string = string(run['id'])
           var run_status: string = string(run['status'])
@@ -171,14 +159,7 @@ export def OpenWorkflow(): void
           var run_url: string = string(run['html_url'])
           var run_number: string = string(run['run_number'])
 
-          #var ic = 'X'
-          #if run_conclusion == 'success'
-          #  ic = '√'
-          #else
-          #  ic = 'X'
-          #endif
 
-          #var run_details = $'       {ic}#{run_number}'
           var emoji: string = ''
           if match(run_conclusion, 'success') != -1
             emoji = '✅'
@@ -190,16 +171,13 @@ export def OpenWorkflow(): void
 
           # Format the run details with the emoji and parentheses for run_id
           var run_details: string = printf(
-                \ '        ➤ %s #%s (Run ID: %s)',
-                \ emoji,
-                \ run_number,
-                \ run_id
-                \ )
+            '        ➤ %s #%s (Run ID: %s)',
+            emoji,
+            run_number,
+            run_id
+          )
 
-
-          # Append the run details to the buffer
-          append(current_line, run_details)
-          current_line += 1
+          popup_content->add(run_details)
         endfor
       else
         echoerr "Error: Unable to fetch workflow runs. Ensure the gh CLI is authenticated."
@@ -212,63 +190,27 @@ export def OpenWorkflow(): void
   endif
 enddef
 
-export def ToggleWorkflowBuffer(): void
-  # Check if the buffer already exists
-  var bufnr: number = bufexists('GitHub Actions')
-
-  if bufnr > 0
-    # If the buffer exists, check if it's visible in any window
-    var bufwinid: number = bufwinnr('GitHub Actions')
-
-    if bufwinid > 0
-      execute $':{bufwinid} wincmd c'
-    else
-      # If the buffer exists but is not visible, open it
-      execute 'buffer ' .. bufnr
-    endif
-  else
-    # If the buffer doesn't exist, call GithubActions to create it
-    execute 'GithubActions'
-  endif
-enddef
-
-export def OpenWorkflowRun(): void
-  # Get the current line
-  var line: string = getline('.')
-
-  # Check if the line contains a Run ID
-  if line =~# '(Run ID: \zs\d\+)'
+export def OpenWorkflowRun(line: string): void
+  if line =~ '(Run ID: \zs\d\+)'
     var run_id: string = matchstr(line, 'Run ID: \zs\d\+')
 
-    # Check if the run is already expanded
-    var next_line: string = getline(line('.') + 1)
-    if next_line =~# 'Job:'
-      # Collapse the expanded run
-      var current_line: number = line('.')
-      while getline(current_line + 1) =~# 'Job:\|Step:'
-        deletebufline('%', current_line + 1)
-      endwhile
+    if CheckCollapse('Job:', 'Job:\|Step:')
       return
     endif
 
-    # Construct the API URL for the jobs in the run
     var api_url: string = printf(
-          \ 'repos/%s/%s/actions/runs/%s/jobs',
-          \ g:github_actions_owner,
-          \ g:github_actions_repo,
-          \ run_id
-          \ )
+      'repos/%s/%s/actions/runs/%s/jobs',
+      g:github_actions_owner,
+      g:github_actions_repo,
+      run_id
+    )
 
-    # Fetch the jobs using the GitHub CLI
     var jobs_json: string = system('gh api ' .. api_url .. ' --jq ".jobs" 2>/dev/null')
 
-    # Check if the gh CLI command succeeded
     if v:shell_error == 0
-      # Parse the JSON into a Vim dictionary
       var jobs: list<any> = json_decode(jobs_json)
+      var insert_location = current_selection + 1
 
-      # Add the jobs below the run
-      var current_line: number = line('.')
       for job in jobs
         var job_name: string = string(job['name'])
         var job_status: string = string(job['status'])
@@ -281,21 +223,18 @@ export def OpenWorkflowRun(): void
         elseif match(job_conclusion, 'failure') != -1
           emoji = '❌'
         else
-          emoji = '⚠️'  # For other statuses like 'neutral', 'cancelled', etc.
+          emoji = '⚠️'
         endif
 
-        # Format the job details
         var job_details: string = printf(
-              \ '            ➤ %s Job: %s',
-              \ emoji,
-              \ job_name
-              \ )
+          '            ➤ %s Job: %s',
+          emoji,
+          job_name
+        )
 
-        # Append the job details to the buffer
-        append(current_line, job_details)
-        current_line += 1
+        insert(popup_content, job_details, insert_location)
+        insert_location += 1
 
-        # Add the steps for the job
         var steps: list<any> = job['steps']
         for step in steps
           var step_name: string = string(step['name'])
@@ -307,19 +246,17 @@ export def OpenWorkflowRun(): void
           elseif match(step_conclusion, 'failure') != -1
             emoji = '❌'
           else
-            emoji = '⚠️'  # For other statuses like 'neutral', 'cancelled', etc.
+            emoji = '⚠️'
           endif
 
-          # Format the step details
           var step_details: string = printf(
-                \ '                ➤ %s Step: %s',
-                \ emoji,
-                \ step_name
-                \ )
+            '                ➤ %s Step: %s',
+            emoji,
+            step_name
+          )
 
-          # Append the step details to the buffer
-          append(current_line, step_details)
-          current_line += 1
+          insert(popup_content, step_details, insert_location)
+          insert_location += 1
         endfor
       endfor
     else
@@ -330,20 +267,6 @@ export def OpenWorkflowRun(): void
   endif
 enddef
 
-export def HandleEnter(): void
-  # Get the current line
-  var line: string = getline('.')
-
-  # Check if the line is a workflow line
-  if line =~# '^    - .* (PATH: \zs\S\+)'
-    OpenWorkflow()
-  # Check if the line is a Run ID line
-  elseif line =~# '(Run ID: \zs\d\+)'
-    OpenWorkflowRun()
-  else
-    echoerr "Error: Not a valid line for expansion."
-  endif
-enddef
 
 export def OpenInGithub(): void
   var line: string = getline('.')
@@ -376,7 +299,7 @@ export def OpenWorkflowFile(): void
       return
     endif
   else
-    for lnum in range(line('.') - 1, 1, -1) # Iterate in reverse from the current line to the first line
+    for lnum in range(line('.') - 1, 1, -1)
       var buffer_line: string = getline(lnum)
       if buffer_line =~# '(PATH: \zs\S\+)'
         var workflow_path: string = matchstr(buffer_line, 'PATH: \zs[^ )]\+')
