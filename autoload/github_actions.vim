@@ -3,6 +3,7 @@ scriptencoding utf-8
 
 var current_selection = 1
 var popup_content = []
+var last_click_line = -1
 
 export def HandleEnter(line: string): void
   if line =~ '(PATH: \zs\S\+)'
@@ -18,15 +19,38 @@ export def FilterPopup(winid: number, key: string): number
   # TODO: add open in github + workflow file support
   if key ==? 'j' || key ==? "\<Down>" || key ==? "\<Left>" || key ==? "\<Right>"
     current_selection = (current_selection + 1) % len(popup_content)
+    win_execute(winid, $'call cursor({current_selection}, 0)')
   elseif key ==? 'k' || key ==? "\<Up>"
     current_selection = (current_selection - 1 + len(popup_content)) % len(popup_content)
   elseif key ==? "\<CR>" || key ==? "\<Space>"
-    var selected_model: string = popup_content[current_selection]
-    HandleEnter(selected_model)
+    HandleEnter(popup_content[current_selection])
+  elseif key ==? "\<LeftMouse>"
+    var details = getmousepos()
+    if winid != details.winid
+      popup_hide(winid)
+    else
+      var selected_line = (details.winrow - 2)
+      if selected_line >= len(popup_content)
+        selected_line = len(popup_content) - 1
+      endif
+      if selected_line >= 0
+        win_execute(winid, $'call cursor({selected_line}, 0)')
+        current_selection = selected_line
+        # TODO: add a timing check for real double clicking feel
+        if last_click_line == current_selection
+          HandleEnter(popup_content[current_selection])
+          # prevent triple-click behavior
+          last_click_line = -1
+        else
+          last_click_line = current_selection
+        endif
+
+      endif
+      return 0
+    endif
   elseif key ==? "\<Esc>" || key ==? 'q'
     popup_close(winid)
     redraw!
-    e!
     return 1
   endif
 
@@ -45,7 +69,7 @@ export def ViewWorkflows(): void
   popup_content = []
   g:github_actions_last_window = win_getid()
 
-  var is_git_repo: bool = system('git rev-parse --is-inside-work-tree 2>/dev/null') =~ 'true'
+  var is_git_repo: bool = system('git rev-parse --is-inside-work-tree') =~ 'true'
 
   if is_git_repo
     var branch_name: string = substitute(system('git rev-parse --abbrev-ref HEAD'), '\n', '', '')
@@ -60,7 +84,7 @@ export def ViewWorkflows(): void
     popup_content->add($'➤ Message:    {commit_message}')
     popup_content->add('')
 
-    var git_remote_url: string = system('git remote get-url origin 2>/dev/null')
+    var git_remote_url: string = system('git remote get-url origin')
     git_remote_url = substitute(git_remote_url, '\n$', '', '')
 
     if git_remote_url =~ 'github\.com[:/]'
@@ -77,7 +101,7 @@ export def ViewWorkflows(): void
       g:github_actions_repo = ''
     endif
 
-    var workflows_json: string = system($'gh api repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows --jq ".workflows" 2>/dev/null')
+    var workflows_json: string = system($'gh api repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows --jq ".workflows"')
 
     if v:shell_error == 0
       var workflows: list<dict<any>> = json_decode(workflows_json)
@@ -103,12 +127,15 @@ export def ViewWorkflows(): void
     'pos': 'center',
     'minwidth': 50,
     'mapping': 0,
+    'dragall': true,
     'title': ' GitHub Actions',
+    'close': 'button',
     'filter': FilterPopup,
+    'curosrline': true,
   }
   var popup_id = popup_create(popup_content, options)
   var bufnr = winbufnr(popup_id)
-  execute 'highlight! GithubActionsCurrentSelection cterm=underline gui=bold'
+  execute 'highlight! GithubActionsCurrentSelection cterm=underline gui=underline guifg=green guisp=green'
   prop_type_add('highlight', {'highlight': 'GithubActionsCurrentSelection', 'bufnr': winbufnr(popup_id)})
 enddef
 
@@ -147,7 +174,7 @@ export def OpenWorkflow(line: string): void
         workflow_path
       )
 
-      var runs_json: string = system('gh api ' .. api_url .. ' --jq ".workflow_runs" 2>/dev/null')
+      var runs_json: string = system('gh api ' .. api_url .. ' --jq ".workflow_runs"')
 
       if v:shell_error == 0
         var runs: list<any> = json_decode(runs_json)
@@ -205,7 +232,7 @@ export def OpenWorkflowRun(line: string): void
       run_id
     )
 
-    var jobs_json: string = system('gh api ' .. api_url .. ' --jq ".jobs" 2>/dev/null')
+    var jobs_json: string = system('gh api ' .. api_url .. ' --jq ".jobs"')
 
     if v:shell_error == 0
       var jobs: list<any> = json_decode(jobs_json)
