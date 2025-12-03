@@ -63,10 +63,7 @@ export def FilterPopup(winid: number, key: string): number
   return 1
 enddef
 
-export def ViewWorkflows(): void
-  popup_content = []
-  g:github_actions_last_window = win_getid()
-
+def FetchRepoDetails()
   var is_git_repo: bool = system('git rev-parse --is-inside-work-tree') =~ 'true'
 
   if is_git_repo
@@ -116,7 +113,13 @@ export def ViewWorkflows(): void
     popup_content->add('Repository: No')
     popup_content->add('This directory is not a Git repository.')
   endif
+enddef
 
+export def ViewWorkflows(): void
+  popup_content = []
+  g:github_actions_last_window = win_getid()
+
+  FetchRepoDetails()
   var options = {
     'border': [1, 1, 1, 1],
     'borderchars': ['─', '│', '─', '│', '┌', '┐', '┘', '└'],
@@ -190,7 +193,7 @@ export def OpenWorkflow(line: string): void
           endif
 
           # Format the run details with the emoji and parentheses for run_id
-          var run_details = '        ➤ {emoji} #{run_number} (Run ID: {run_id})'
+          var run_details = $'        ➤ {emoji} #{run_number} (Run ID: {run_id})'
           popup_content->add(run_details)
         endfor
       else
@@ -254,7 +257,7 @@ export def OpenWorkflowRun(line: string): void
             emoji = '⚠️'
           endif
 
-          var step_details = '                ➤ {emoji} Step: {step_name}'
+          var step_details = $'                ➤ {emoji} Step: {step_name}'
           insert(popup_content, step_details, insert_location)
           insert_location += 1
         endfor
