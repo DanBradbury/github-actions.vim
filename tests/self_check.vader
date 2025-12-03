@@ -1,0 +1,7 @@
+Execute:
+  AssertEqual popup_list(), []
+  :GithubActions
+  let popups = popup_list()
+  AssertEqual len(popups), 1
+  let header_line = win_execute(popups[0], 'echo getline(1)')
+  Assert header_line =~ 'Repository:'

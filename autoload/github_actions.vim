@@ -10,8 +10,6 @@ export def HandleEnter(line: string): void
     OpenWorkflow(line)
   elseif line =~ '(Run ID: \zs\d\+)'
     OpenWorkflowRun(line)
-  else
-    echoerr "Error: Not a valid line for expansion."
   endif
 enddef
 
@@ -167,12 +165,7 @@ export def OpenWorkflow(line: string): void
     endif
 
     if workflow_path !=# ''
-      var api_url: string = printf(
-        'repos/%s/%s/actions/workflows/%s/runs',
-        g:github_actions_owner,
-        g:github_actions_repo,
-        workflow_path
-      )
+      var api_url = $'repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows/{workflow_path}/runs'
 
       var runs_json: string = system('gh api ' .. api_url .. ' --jq ".workflow_runs"')
 
@@ -197,13 +190,7 @@ export def OpenWorkflow(line: string): void
           endif
 
           # Format the run details with the emoji and parentheses for run_id
-          var run_details: string = printf(
-            '        ➤ %s #%s (Run ID: %s)',
-            emoji,
-            run_number,
-            run_id
-          )
-
+          var run_details = '        ➤ {emoji} #{run_number} (Run ID: {run_id})'
           popup_content->add(run_details)
         endfor
       else
@@ -225,14 +212,9 @@ export def OpenWorkflowRun(line: string): void
       return
     endif
 
-    var api_url: string = printf(
-      'repos/%s/%s/actions/runs/%s/jobs',
-      g:github_actions_owner,
-      g:github_actions_repo,
-      run_id
-    )
+    var api_url = $'repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/runs/{run_id}/jobs'
 
-    var jobs_json: string = system('gh api ' .. api_url .. ' --jq ".jobs"')
+    var jobs_json: string = system($'gh api {api_url} --jq ".jobs"')
 
     if v:shell_error == 0
       var jobs: list<any> = json_decode(jobs_json)
@@ -253,11 +235,7 @@ export def OpenWorkflowRun(line: string): void
           emoji = '⚠️'
         endif
 
-        var job_details: string = printf(
-          '            ➤ %s Job: %s',
-          emoji,
-          job_name
-        )
+        var job_details = $'            ➤ {emoji} Job: {job_name}'
 
         insert(popup_content, job_details, insert_location)
         insert_location += 1
@@ -276,12 +254,7 @@ export def OpenWorkflowRun(line: string): void
             emoji = '⚠️'
           endif
 
-          var step_details: string = printf(
-            '                ➤ %s Step: %s',
-            emoji,
-            step_name
-          )
-
+          var step_details = '                ➤ {emoji} Step: {step_name}'
           insert(popup_content, step_details, insert_location)
           insert_location += 1
         endfor
