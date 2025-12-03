@@ -5,6 +5,11 @@ var current_selection = 1
 var popup_content = []
 var last_click_line = -1
 
+g:spinner = ["Loading·", "✻", "✽", "✶", "✳", "✢"]
+g:spinner_location = 0
+g:still_loading = true
+g:active_popup = -1
+
 export def HandleEnter(line: string): void
   if line =~ '(PATH: \zs\S\+)'
     OpenWorkflow(line)
@@ -63,7 +68,20 @@ export def FilterPopup(winid: number, key: string): number
   return 1
 enddef
 
-def FetchRepoDetails()
+def RotateLoader(timer: number)
+  echom "rotating"
+  if g:still_loading
+    g:spinner_location += 1
+    if g:spinner_location >= len(g:spinner)
+      g:spinner_location = 0
+    endif
+    popup_settext(g:active_popup, [$'{repeat(" ", 24)}{g:spinner[g:spinner_location]}'])
+    redraw
+    timer_start(timer, 'RotateLoader')
+  endif
+enddef
+
+def FetchRepoDetails(timer: number)
   var is_git_repo: bool = system('git rev-parse --is-inside-work-tree') =~ 'true'
 
   if is_git_repo
@@ -113,31 +131,37 @@ def FetchRepoDetails()
     popup_content->add('Repository: No')
     popup_content->add('This directory is not a Git repository.')
   endif
+  g:still_loading = false
+  popup_settext(g:active_popup, popup_content)
 enddef
 
 export def ViewWorkflows(): void
   popup_content = []
   g:github_actions_last_window = win_getid()
+  # TODO: option time
+  var min_width = 50
 
-  FetchRepoDetails()
   var options = {
     'border': [1, 1, 1, 1],
     'borderchars': ['─', '│', '─', '│', '┌', '┐', '┘', '└'],
     'borderhighlight': ['DiffAdd'],
     'padding': [1, 1, 1, 1],
     'pos': 'center',
-    'minwidth': 50,
+    'minwidth': min_width,
     'mapping': 0,
     'dragall': true,
     'title': ' GitHub Actions',
     'close': 'button',
     'filter': FilterPopup,
-    'curosrline': true,
+    #'curosrline': true,
   }
-  var popup_id = popup_create(popup_content, options)
+  var popup_id = popup_create([$'{repeat(" ", 24)}{g:spinner[g:spinner_location]}'], options)
+  timer_start(300, 'RotateLoader')
+  timer_start(100, 'FetchRepoDetails')
   var bufnr = winbufnr(popup_id)
   execute 'highlight! GithubActionsCurrentSelection cterm=underline gui=underline guifg=green guisp=green'
   prop_type_add('highlight', {'highlight': 'GithubActionsCurrentSelection', 'bufnr': winbufnr(popup_id)})
+  g:active_popup = popup_id
 enddef
 
 def CheckCollapse(initial_search: string, while_check: string): bool
