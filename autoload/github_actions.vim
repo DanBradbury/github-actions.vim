@@ -5,10 +5,10 @@ var current_selection = 1
 var popup_content = []
 var last_click_line = -1
 
-g:spinner = ["Loading·", "✻", "✽", "✶", "✳", "✢"]
-g:spinner_location = 0
-g:still_loading = true
-g:active_popup = -1
+var spinner = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']
+var spinner_location = 0
+var loading = true
+var active_popup = -1
 
 export def HandleEnter(line: string): void
   if line =~ '(PATH: \zs\S\+)'
@@ -69,73 +69,58 @@ export def FilterPopup(winid: number, key: string): number
 enddef
 
 def RotateLoader(timer: number)
-  echom "rotating"
-  if g:still_loading
-    g:spinner_location += 1
-    if g:spinner_location >= len(g:spinner)
-      g:spinner_location = 0
+  if loading
+    spinner_location += 1
+    if spinner_location >= len(spinner)
+      spinner_location = 0
     endif
-    popup_settext(g:active_popup, [$'{repeat(" ", 24)}{g:spinner[g:spinner_location]}'])
-    redraw
+    popup_settext(active_popup, [$'{repeat(" ", 24)}{spinner[spinner_location]}'])
     timer_start(timer, 'RotateLoader')
   endif
 enddef
 
-def FetchRepoDetails(timer: number)
-  var is_git_repo: bool = system('git rev-parse --is-inside-work-tree') =~ 'true'
+def DecodeWorkflowResponse(channel: channel, workflows_json: string)
+  var workflows: list<dict<any>> = json_decode(workflows_json)
+  popup_content->add('Workflows:')
 
-  if is_git_repo
-    var branch_name: string = substitute(system('git rev-parse --abbrev-ref HEAD'), '\n', '', '')
-    var commit_hash: string = substitute(system('git log -1 --pretty=format:"%h"'), '\n', '', '')
-    var commit_message: string = substitute(system('git log -1 --pretty=format:"%s"'), '\n', '', '')
-    var remote_url: string = substitute(system('git config --get remote.origin.url'), '\n', '', '')
-    remote_url = substitute(remote_url, '.*github.com[:/]', '', '')
+  for workflow in workflows
+    var cleaned_workflow_path: string = substitute(workflow.path, '\v(\.github/workflows/|dynamic/)', '', '')
+    popup_content->add($'    - {workflow.name} (PATH: {cleaned_workflow_path})')
+  endfor
+  loading = false
+  popup_settext(active_popup, popup_content)
+  popup_setoptions(active_popup, {'filter': FilterPopup})
+enddef
 
-    popup_content->add($'✔ Repository: {remote_url}')
-    popup_content->add($'➤ Branch:     {branch_name}')
-    popup_content->add($'➤ Commit:     {commit_hash}')
-    popup_content->add($'➤ Message:    {commit_message}')
-    popup_content->add('')
+def ProcessRepoDetails(channel: channel, msg: string)
+  var git_remote_url = substitute(msg, '\n$', '', '')
 
-    var git_remote_url: string = system('git remote get-url origin')
-    git_remote_url = substitute(git_remote_url, '\n$', '', '')
+  if git_remote_url =~ 'github\.com[:/]'
+    var owner_repo: string = matchstr(git_remote_url, 'github\.com[:/]\zs[^/]*\/[^/]*')
+    var split_values: list<string> = split(owner_repo, '/')
+    var raw_repo: string = split_values[1]
+    raw_repo = substitute(raw_repo, '\.git$', '', '')
+    g:github_actions_owner = split_values[0]
+    g:github_actions_repo = raw_repo
+  else
+    echo "Not a GitHub repository"
+    g:github_actions_owner = ''
+    g:github_actions_repo = ''
+  endif
+  job_start($'gh api repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows --jq ".workflows"', {'out_cb': 'DecodeWorkflowResponse'})
+enddef
 
-    if git_remote_url =~ 'github\.com[:/]'
-      var owner_repo: string = matchstr(git_remote_url, 'github\.com[:/]\zs[^/]*\/[^/]*')
-      var split_values: list<string> = split(owner_repo, '/')
-      var raw_repo: string = split_values[1]
-      raw_repo = substitute(raw_repo, '\.git$', '', '')
-      g:github_actions_owner = split_values[0]
-      g:github_actions_repo = raw_repo
-
-    else
-      echo "Not a GitHub repository"
-      g:github_actions_owner = ''
-      g:github_actions_repo = ''
-    endif
-
-    var workflows_json: string = system($'gh api repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows --jq ".workflows"')
-
-    if v:shell_error == 0
-      var workflows: list<dict<any>> = json_decode(workflows_json)
-      popup_content->add('Workflows:')
-
-      for workflow in workflows
-        var cleaned_workflow_path: string = substitute(workflow.path, '\v(\.github/workflows/|dynamic/)', '', '')
-        popup_content->add($'    - {workflow.name} (PATH: {cleaned_workflow_path})')
-      endfor
-    else
-      popup_content->add('Error: Unable to fetch workflows. Ensure the gh CLI is authenticated.')
-    endif
+def GithubRepoCheck(channel: channel, msg: any)
+  if msg =~ 'true'
+    job_start('git remote get-url origin', {'out_cb': 'ProcessRepoDetails'})
   else
     popup_content->add('Repository: No')
     popup_content->add('This directory is not a Git repository.')
   endif
-  g:still_loading = false
-  popup_settext(g:active_popup, popup_content)
 enddef
 
 export def ViewWorkflows(): void
+  loading = true
   popup_content = []
   g:github_actions_last_window = win_getid()
   # TODO: option time
@@ -152,16 +137,13 @@ export def ViewWorkflows(): void
     'dragall': true,
     'title': ' GitHub Actions',
     'close': 'button',
-    'filter': FilterPopup,
-    #'curosrline': true,
   }
-  var popup_id = popup_create([$'{repeat(" ", 24)}{g:spinner[g:spinner_location]}'], options)
-  timer_start(300, 'RotateLoader')
-  timer_start(100, 'FetchRepoDetails')
-  var bufnr = winbufnr(popup_id)
+  active_popup = popup_create([$'{repeat(" ", 24)}{spinner[spinner_location]}'], options)
+  timer_start(200, 'RotateLoader')
+  job_start('git rev-parse --is-inside-work-tree', {'out_cb': 'GithubRepoCheck'})
+  var bufnr = winbufnr(active_popup)
   execute 'highlight! GithubActionsCurrentSelection cterm=underline gui=underline guifg=green guisp=green'
-  prop_type_add('highlight', {'highlight': 'GithubActionsCurrentSelection', 'bufnr': winbufnr(popup_id)})
-  g:active_popup = popup_id
+  prop_type_add('highlight', {'highlight': 'GithubActionsCurrentSelection', 'bufnr': winbufnr(active_popup)})
 enddef
 
 def CheckCollapse(initial_search: string, while_check: string): bool
