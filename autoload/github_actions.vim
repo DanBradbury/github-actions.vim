@@ -31,10 +31,10 @@ enddef
 
 export def FilterPopup(winid: number, key: string): number
   # TODO: add open in github + workflow file support
-  if key ==? 'j' || key ==? "\<Down>" || key ==? "\<Left>" || key ==? "\<Right>"
+  if key ==? 'j' || key ==? "\<Down>" || key ==? "\<Right>"
     current_selection = (current_selection + 1) % len(popup_content)
     win_execute(winid, $'call cursor({current_selection}, 0)')
-  elseif key ==? 'k' || key ==? "\<Up>"
+  elseif key ==? 'k' || key ==? "\<Up>" || key ==? "\<Left>"
     current_selection = (current_selection - 1 + len(popup_content)) % len(popup_content)
   elseif key ==? "\<CR>" || key ==? "\<Space>"
     HandleEnter(popup_content[current_selection])
@@ -157,7 +157,7 @@ export def ViewWorkflows(): void
   timer_start(80, 'RotateLoader')
   job_start('git rev-parse --is-inside-work-tree', {'out_cb': 'GithubRepoCheck'})
   var bufnr = winbufnr(active_popup)
-  execute 'highlight! GithubActionsCurrentSelection cterm=underline gui=underline guifg=green guisp=green'
+  execute 'highlight! GithubActionsCurrentSelection cterm=underline ctermbg=green gui=underline guifg=green guisp=green'
   prop_type_add('highlight', {'highlight': 'GithubActionsCurrentSelection', 'bufnr': winbufnr(active_popup)})
 enddef
 
@@ -204,6 +204,7 @@ def ParseWorkflowRun(channel: channel, workflow_runs_json: string)
     var run_details = $'        ➤ {emoji} #{run_number} (Run ID: {run_id})'
     popup_content->add(run_details)
   endfor
+  popup_settext(active_popup, popup_content)
 enddef
 
 export def OpenWorkflow(line: string): void
@@ -224,6 +225,52 @@ export def OpenWorkflow(line: string): void
   endif
 enddef
 
+def ParseRunJobs(channel: channel, jobs_json: string)
+  var jobs: list<any> = json_decode(jobs_json)
+  var insert_location = current_selection + 1
+
+  for job in jobs
+    var job_name: string = string(job['name'])
+    var job_status: string = string(job['status'])
+    var job_conclusion: string = string(job['conclusion'])
+    var job_started_at: string = string(job['started_at'])
+
+    var emoji: string = ''
+    if match(job_conclusion, 'success') != -1
+      emoji = '✅'
+    elseif match(job_conclusion, 'failure') != -1
+      emoji = '❌'
+    else
+      emoji = '⚠️'
+    endif
+
+    var job_details = $'            ➤ {emoji} Job: {job_name}'
+
+    insert(popup_content, job_details, insert_location)
+    insert_location += 1
+
+    var steps: list<any> = job['steps']
+    for step in steps
+      var step_name: string = string(step['name'])
+      var step_status: string = string(step['status'])
+      var step_conclusion: string = string(step['conclusion'])
+
+      if match(step_conclusion, 'success') != -1
+        emoji = '✅'
+      elseif match(step_conclusion, 'failure') != -1
+        emoji = '❌'
+      else
+        emoji = '⚠️'
+      endif
+
+      var step_details = $'                ➤ {emoji} Step: {step_name}'
+      insert(popup_content, step_details, insert_location)
+      insert_location += 1
+    endfor
+  endfor
+  popup_settext(active_popup, popup_content)
+enddef
+
 export def OpenWorkflowRun(line: string): void
   if line =~ '(Run ID: \zs\d\+)'
     var run_id: string = matchstr(line, 'Run ID: \zs\d\+')
@@ -233,55 +280,8 @@ export def OpenWorkflowRun(line: string): void
     endif
 
     var api_url = $'repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/runs/{run_id}/jobs'
+    job_start($'gh api {api_url} --jq ".jobs"', {'out_cb': ParseRunJobs})
 
-    var jobs_json: string = system($'gh api {api_url} --jq ".jobs"')
-
-    if v:shell_error == 0
-      var jobs: list<any> = json_decode(jobs_json)
-      var insert_location = current_selection + 1
-
-      for job in jobs
-        var job_name: string = string(job['name'])
-        var job_status: string = string(job['status'])
-        var job_conclusion: string = string(job['conclusion'])
-        var job_started_at: string = string(job['started_at'])
-
-        var emoji: string = ''
-        if match(job_conclusion, 'success') != -1
-          emoji = '✅'
-        elseif match(job_conclusion, 'failure') != -1
-          emoji = '❌'
-        else
-          emoji = '⚠️'
-        endif
-
-        var job_details = $'            ➤ {emoji} Job: {job_name}'
-
-        insert(popup_content, job_details, insert_location)
-        insert_location += 1
-
-        var steps: list<any> = job['steps']
-        for step in steps
-          var step_name: string = string(step['name'])
-          var step_status: string = string(step['status'])
-          var step_conclusion: string = string(step['conclusion'])
-
-          if match(step_conclusion, 'success') != -1
-            emoji = '✅'
-          elseif match(step_conclusion, 'failure') != -1
-            emoji = '❌'
-          else
-            emoji = '⚠️'
-          endif
-
-          var step_details = $'                ➤ {emoji} Step: {step_name}'
-          insert(popup_content, step_details, insert_location)
-          insert_location += 1
-        endfor
-      endfor
-    else
-      echoerr "Error: Unable to fetch jobs for Run ID: " .. run_id
-    endif
   else
     echoerr "Error: Not a valid Run ID line."
   endif
