@@ -5,7 +5,18 @@ var current_selection = 1
 var popup_content = []
 var last_click_line = -1
 
-var spinner = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']
+var spinner = [
+			"( ●    )",
+			"(  ●   )",
+			"(   ●  )",
+			"(    ● )",
+			"(     ●)",
+			"(    ● )",
+			"(   ●  )",
+			"(  ●   )",
+			"( ●    )",
+			"(●     )"
+		]
 var spinner_location = 0
 var loading = true
 var active_popup = -1
@@ -27,6 +38,10 @@ export def FilterPopup(winid: number, key: string): number
     current_selection = (current_selection - 1 + len(popup_content)) % len(popup_content)
   elseif key ==? "\<CR>" || key ==? "\<Space>"
     HandleEnter(popup_content[current_selection])
+  elseif key ==? 'o'
+    OpenInGithub(popup_content[current_selection])
+  elseif key ==? 'w'
+    OpenWorkflowFile(popup_content[current_selection])
   elseif key ==? "\<LeftMouse>"
     var details = getmousepos()
     if winid != details.winid
@@ -74,7 +89,7 @@ def RotateLoader(timer: number)
     if spinner_location >= len(spinner)
       spinner_location = 0
     endif
-    popup_settext(active_popup, [$'{repeat(" ", 24)}{spinner[spinner_location]}'])
+    popup_settext(active_popup, [$'{repeat(" ", 21)}{spinner[spinner_location]}'])
     timer_start(timer, 'RotateLoader')
   endif
 enddef
@@ -138,8 +153,8 @@ export def ViewWorkflows(): void
     'title': ' GitHub Actions',
     'close': 'button',
   }
-  active_popup = popup_create([$'{repeat(" ", 24)}{spinner[spinner_location]}'], options)
-  timer_start(200, 'RotateLoader')
+  active_popup = popup_create([$'{repeat(" ", 21)}{spinner[spinner_location]}'], options)
+  timer_start(80, 'RotateLoader')
   job_start('git rev-parse --is-inside-work-tree', {'out_cb': 'GithubRepoCheck'})
   var bufnr = winbufnr(active_popup)
   execute 'highlight! GithubActionsCurrentSelection cterm=underline gui=underline guifg=green guisp=green'
@@ -165,6 +180,32 @@ def CheckCollapse(initial_search: string, while_check: string): bool
   return false
 enddef
 
+def ParseWorkflowRun(channel: channel, workflow_runs_json: string)
+  var runs: list<any> = json_decode(workflow_runs_json)
+
+  for run in runs
+    var run_id: string = string(run['id'])
+    var run_status: string = string(run['status'])
+    var run_conclusion: string = string(run['conclusion'])
+    var run_url: string = string(run['html_url'])
+    var run_number: string = string(run['run_number'])
+
+
+    var emoji: string = ''
+    if match(run_conclusion, 'success') != -1
+      emoji = '✅'
+    elseif match(run_conclusion, 'failure') != -1
+      emoji = '❌'
+    else
+      emoji = '⚠️'
+    endif
+
+    # Format the run details with the emoji and parentheses for run_id
+    var run_details = $'        ➤ {emoji} #{run_number} (Run ID: {run_id})'
+    popup_content->add(run_details)
+  endfor
+enddef
+
 export def OpenWorkflow(line: string): void
   if line =~# '(PATH: \zs\S\+)'
     var workflow_path: string = matchstr(line, 'PATH: \zs[^ )]\+')
@@ -174,37 +215,7 @@ export def OpenWorkflow(line: string): void
     endif
 
     if workflow_path !=# ''
-      var api_url = $'repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows/{workflow_path}/runs'
-
-      var runs_json: string = system('gh api ' .. api_url .. ' --jq ".workflow_runs"')
-
-      if v:shell_error == 0
-        var runs: list<any> = json_decode(runs_json)
-
-        for run in runs
-          var run_id: string = string(run['id'])
-          var run_status: string = string(run['status'])
-          var run_conclusion: string = string(run['conclusion'])
-          var run_url: string = string(run['html_url'])
-          var run_number: string = string(run['run_number'])
-
-
-          var emoji: string = ''
-          if match(run_conclusion, 'success') != -1
-            emoji = '✅'
-          elseif match(run_conclusion, 'failure') != -1
-            emoji = '❌'
-          else
-            emoji = '⚠️'  # For other statuses like 'neutral', 'cancelled', etc.
-          endif
-
-          # Format the run details with the emoji and parentheses for run_id
-          var run_details = $'        ➤ {emoji} #{run_number} (Run ID: {run_id})'
-          popup_content->add(run_details)
-        endfor
-      else
-        echoerr "Error: Unable to fetch workflow runs. Ensure the gh CLI is authenticated."
-      endif
+      job_start($'gh api repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows/{workflow_path}/runs --jq ".workflow_runs"', {'out_cb': ParseWorkflowRun})
     else
       echoerr "Error: Unable to determine repository or workflow path."
     endif
@@ -277,14 +288,17 @@ export def OpenWorkflowRun(line: string): void
 enddef
 
 
-export def OpenInGithub(): void
-  var line: string = getline('.')
-  if line =~# '(PATH: \zs\S\+)'
+export def OpenInGithub(line: string): void
+  if line =~ '(PATH: \zs\S\+)'
     var workflow_path: string = matchstr(line, 'PATH: \zs[^ )]\+')
 
     if workflow_path != ''
       var url: string = $'https://github.com/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows/{workflow_path}'
-      call system($'open {shellescape(url)}')
+      if has("win32")
+        system($'explorer {shellescape(url)}')
+      else
+        system($'open {shellescape(url)}')
+      endif
     else
       echo "Error: Unable to determine repository or workflow ID."
     endif
@@ -292,13 +306,16 @@ export def OpenInGithub(): void
     var run_id: string = matchstr(line, '(Run ID: \zs\d\+')
     if run_id != ''
       var url: string = $'https://github.com/{g:github_actions_owner}/{g:github_actions_repo}/actions/runs/{run_id}'
-      call system($'open {shellescape(url)}')
+      if has("win32")
+        call system($'explorer {shellescape(url)}')
+      else
+        call system($'open {shellescape(url)}')
+      endif
     endif
   endif
 enddef
 
-export def OpenWorkflowFile(): void
-  var line: string = getline('.')
+export def OpenWorkflowFile(line: string): void
   if line =~# '(PATH: \zs\S\+)'
     var workflow_path: string = matchstr(line, 'PATH: \zs[^ )]\+')
     var file: string = $'.github/workflows/{workflow_path}'
