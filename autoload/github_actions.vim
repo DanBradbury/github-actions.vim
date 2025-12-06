@@ -182,6 +182,7 @@ enddef
 
 def ParseWorkflowRun(channel: channel, workflow_runs_json: string)
   var runs: list<any> = json_decode(workflow_runs_json)
+  var insert_location = current_selection + 1
 
   for run in runs
     var run_id: string = string(run['id'])
@@ -202,7 +203,8 @@ def ParseWorkflowRun(channel: channel, workflow_runs_json: string)
 
     # Format the run details with the emoji and parentheses for run_id
     var run_details = $'        ➤ {emoji} #{run_number} (Run ID: {run_id})'
-    popup_content->add(run_details)
+    insert(popup_content, run_details, insert_location)
+    insert_location += 1
   endfor
   popup_settext(active_popup, popup_content)
 enddef
