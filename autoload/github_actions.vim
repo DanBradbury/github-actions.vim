@@ -21,6 +21,15 @@ var spinner_location = 0
 var loading = true
 var active_popup = -1
 
+var navigation_breadcrumbs = []
+#var current_popup_content = []
+var previous_popup_content = []
+
+def OpenItem(item_num: string)
+  var found_items = filter(copy(popup_content), $'v:val =~ "{item_num}"')
+  HandleEnter(found_items[0])
+enddef
+
 export def HandleEnter(line: string): void
   if line =~ '(PATH: \zs\S\+)'
     OpenWorkflow(line)
@@ -30,6 +39,9 @@ export def HandleEnter(line: string): void
 enddef
 
 def HighlightSelection(bufnr: number)
+  if current_selection + 1 > len(popup_content)
+    current_selection = 0
+  endif
   prop_add(current_selection + 1, 1, {
     'type': 'highlight',
     'length': 100,
@@ -38,7 +50,6 @@ def HighlightSelection(bufnr: number)
 enddef
 
 export def FilterPopup(winid: number, key: string): number
-  # TODO: add open in github + workflow file support
   if key ==? 'j' || key ==? "\<Down>" || key ==? "\<Right>"
     current_selection = (current_selection + 1) % len(popup_content)
     win_execute(winid, $'call cursor({current_selection}, 0)')
@@ -47,7 +58,7 @@ export def FilterPopup(winid: number, key: string): number
   elseif key ==? "\<CR>" || key ==? "\<Space>"
     HandleEnter(popup_content[current_selection])
   elseif key ==? 'o'
-    OpenInGithub(popup_content[current_selection])
+    OpenInGithub()
   elseif key ==? 'w'
     OpenWorkflowFile(popup_content[current_selection])
   elseif key ==? "\<LeftMouse>"
@@ -78,6 +89,18 @@ export def FilterPopup(winid: number, key: string): number
     popup_close(winid)
     redraw!
     return 1
+  elseif index(['1', '2', '3', '4', '5', '6', '7', '8', '9'], key) != -1
+    OpenItem(key)
+    return 1
+  elseif key ==? "\<BS>"
+    var c = copy(popup_content)
+    popup_content = previous_popup_content
+    previous_popup_content = c
+    popup_settext(active_popup, popup_content)
+    HighlightSelection(winbufnr(active_popup))
+    return 1
+  else
+    echom key
   endif
 
   popup_settext(active_popup, popup_content)
@@ -100,11 +123,14 @@ enddef
 
 def DecodeWorkflowResponse(channel: channel, workflows_json: string)
   var workflows: list<dict<any>> = json_decode(workflows_json)
-  popup_content->add('Workflows:')
+  popup_content->add('Workflows')
+  popup_content->add('')
+  var workflow_count = 1
 
   for workflow in workflows
     var cleaned_workflow_path: string = substitute(workflow.path, '\v(\.github/workflows/|dynamic/)', '', '')
-    popup_content->add($'    - {workflow.name} (PATH: {cleaned_workflow_path})')
+    popup_content->add($'    {workflow_count}. {workflow.name} (PATH: {cleaned_workflow_path})')
+    workflow_count += 1
   endfor
   loading = false
   popup_settext(active_popup, popup_content)
@@ -139,7 +165,7 @@ def GithubRepoCheck(channel: channel, msg: any)
   endif
 enddef
 
-export def ViewWorkflows(): void
+export def OpenPopup(): void
   loading = true
   popup_content = []
   g:github_actions_last_window = win_getid()
@@ -159,8 +185,9 @@ export def ViewWorkflows(): void
     'close': 'button',
   }
   active_popup = popup_create([$'{repeat(" ", 21)}{spinner[spinner_location]}'], options)
-  timer_start(80, 'RotateLoader')
   job_start('git rev-parse --is-inside-work-tree', {'out_cb': 'GithubRepoCheck'})
+  timer_start(80, 'RotateLoader')
+
   var bufnr = winbufnr(active_popup)
   execute 'highlight! GithubActionsCurrentSelection cterm=underline ctermbg=green gui=underline guifg=green guisp=green'
   prop_type_add('highlight', {'highlight': 'GithubActionsCurrentSelection', 'bufnr': winbufnr(active_popup)})
@@ -189,6 +216,8 @@ def ParseWorkflowRun(channel: channel, workflow_runs_json: string)
   var runs: list<any> = json_decode(workflow_runs_json)
   var insert_location = current_selection + 1
 
+  var content = extend(copy(navigation_breadcrumbs), [''])
+
   for run in runs
     var run_id: string = string(run['id'])
     var run_status: string = string(run['status'])
@@ -208,14 +237,19 @@ def ParseWorkflowRun(channel: channel, workflow_runs_json: string)
 
     # Format the run details with the emoji and parentheses for run_id
     var run_details = $'        ➤ {emoji} #{run_number} (Run ID: {run_id})'
-    insert(popup_content, run_details, insert_location)
-    insert_location += 1
+    content->add(run_details)
+    #insert(popup_content, run_details, insert_location)
+    #insert_location += 1
   endfor
+  previous_popup_content = popup_content
+  popup_content = content
   popup_settext(active_popup, popup_content)
+  #popup_settext(active_popup, content)
   HighlightSelection(winbufnr(active_popup))
 enddef
 
 export def OpenWorkflow(line: string): void
+  navigation_breadcrumbs = []
   if line =~# '(PATH: \zs\S\+)'
     var workflow_path: string = matchstr(line, 'PATH: \zs[^ )]\+')
 
@@ -224,6 +258,7 @@ export def OpenWorkflow(line: string): void
     endif
 
     if workflow_path !=# ''
+      navigation_breadcrumbs->add(workflow_path)
       job_start($'gh api repos/{g:github_actions_owner}/{g:github_actions_repo}/actions/workflows/{workflow_path}/runs --jq ".workflow_runs"', {'out_cb': ParseWorkflowRun})
     else
       echoerr "Error: Unable to determine repository or workflow path."
@@ -297,7 +332,8 @@ export def OpenWorkflowRun(line: string): void
 enddef
 
 
-export def OpenInGithub(line: string): void
+export def OpenInGithub(): void
+  var line = popup_content[current_selection]
   if line =~ '(PATH: \zs\S\+)'
     var workflow_path: string = matchstr(line, 'PATH: \zs[^ )]\+')
 

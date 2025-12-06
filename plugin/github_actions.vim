@@ -8,4 +8,4 @@ if exists('g:loaded_github_actions')
 endif
 g:loaded_github_actions = 1
 
-command! -nargs=0 GithubActions base.ViewWorkflows()
+command! -nargs=0 GithubActions base.OpenPopup()

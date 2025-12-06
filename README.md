@@ -8,7 +8,7 @@ https://github.com/user-attachments/assets/22c821bf-8dc0-4260-a00e-b3282685d493
 
 ## Requirements
 
-- Vim 9.0+ or Neovim.
+- Vim 9.0+
 - The `gh` CLI tool must be installed and authenticated. You can install it from [GitHub CLI](https://cli.github.com/).
 
 ---
@@ -26,15 +26,19 @@ https://github.com/user-attachments/assets/22c821bf-8dc0-4260-a00e-b3282685d493
 ### Commands
 
 - `:GithubActions`
-  Opens the GitHub Actions sidebar buffer.
+  Opens/toggles the GitHub Actions popup
 
-- `:GithubActionsToggle`
-  Toggles the visibility of the GitHub Actions sidebar buffer.
+### Popup Keybindings
 
-### Keybindings
-
-- Press `<CR>` (Enter) on a workflow line to open the workflow in your default browser.
-- Press `gf` in the actions window to open the the workflow file in the last active window.
+- `Number keys`
+Open workflow listed with the given number
+- `Enter` on a workflow line to open the workflow in your default browser.
+- `Backspace`
+Go back to previous page content
+- `o`
+Open whats under the cursor in GitHub (Workflow, Workflow run)
+- `w`
+Open workflow file in the last active buffer
 
 ---
 
