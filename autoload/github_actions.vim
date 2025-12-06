@@ -29,6 +29,14 @@ export def HandleEnter(line: string): void
   endif
 enddef
 
+def HighlightSelection(bufnr: number)
+  prop_add(current_selection + 1, 1, {
+    'type': 'highlight',
+    'length': 100,
+    'bufnr': bufnr
+  })
+enddef
+
 export def FilterPopup(winid: number, key: string): number
   # TODO: add open in github + workflow file support
   if key ==? 'j' || key ==? "\<Down>" || key ==? "\<Right>"
@@ -72,12 +80,8 @@ export def FilterPopup(winid: number, key: string): number
     return 1
   endif
 
-  popup_settext(winid, popup_content)
-  prop_add(current_selection + 1, 1, {
-    'type': 'highlight',
-    'length': 60,
-    'bufnr': winbufnr(winid)
-  })
+  popup_settext(active_popup, popup_content)
+  HighlightSelection(winbufnr(active_popup))
   redraw
 
   return 1
@@ -105,6 +109,7 @@ def DecodeWorkflowResponse(channel: channel, workflows_json: string)
   loading = false
   popup_settext(active_popup, popup_content)
   popup_setoptions(active_popup, {'filter': FilterPopup})
+  HighlightSelection(winbufnr(active_popup))
 enddef
 
 def ProcessRepoDetails(channel: channel, msg: string)
@@ -207,6 +212,7 @@ def ParseWorkflowRun(channel: channel, workflow_runs_json: string)
     insert_location += 1
   endfor
   popup_settext(active_popup, popup_content)
+  HighlightSelection(winbufnr(active_popup))
 enddef
 
 export def OpenWorkflow(line: string): void
@@ -271,6 +277,7 @@ def ParseRunJobs(channel: channel, jobs_json: string)
     endfor
   endfor
   popup_settext(active_popup, popup_content)
+  HighlightSelection(winbufnr(active_popup))
 enddef
 
 export def OpenWorkflowRun(line: string): void
